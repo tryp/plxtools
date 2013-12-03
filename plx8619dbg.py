@@ -101,6 +101,7 @@ def plx_get_portconfig(handle, device):
 
 def plx_8619_get_portmap(portcfg):
     ''' decode the port lane allocations from the pex8619 portcfg value '''
+    portmap = []
     if portcfg == 0:
         portmap = num_ports * [1]
     elif portcfg == 1:
@@ -234,7 +235,7 @@ def plx_get_debug_control(handle, device):
     ''' return a dict of decoded Debug Control register subvalues '''
     val = plx_read_qword(handle, device, 0, 0x1dc)
     debug_control = {}
-    debug_control["**note**"] = "See PEX8619 Databook Register 14-64"
+    debug_control["**note**"] = "See PEX8619 Databook Register 14-64 (1DCh)"
     debug_control["UPCFG Timer Enable"] = (val >> 4) & 0x1
     debug_control["SMBus Enable"] = (val >> 5) & 0x1
     debug_control["NT P2P Enable"] = (val >> 6) & 0x1
@@ -261,6 +262,7 @@ def plx_get_link_status(handle, device, port):
     s_map=[0, 2.5, 5.0]
     ls = {}
     ls["Port"] = port
+    ls["**note**"] = "See PEX8619 Databook Register 14-29 (78h)"
     ls["ASPM"] = (val >> 0) & 0x3
     ls["Link Disable"] = (val >> 4) & 0x1
     ls["Common Clock Configuration"] = (val >> 6) & 0x1
