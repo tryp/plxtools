@@ -191,10 +191,10 @@ def plx_get_receiver_detected(handle, device):
 
     rd = num_lanes * [0]
     for i in range(8):
-        rd[i] = (rd_low >> (24 + 1)) & 0x1
+        rd[i] = (rd_low >> (24 + i)) & 0x1
         
     for i in range(8):
-        rd[8 + i] = (rd_high >> (24 + 1)) & 0x1
+        rd[8 + i] = (rd_high >> (24 + i)) & 0x1
 
     return rd
 
