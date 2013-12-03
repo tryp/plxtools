@@ -6,30 +6,6 @@
 # Connects to a PLX PCIe switch I2C port and reads
 # registers for debug.
 #
-#==========================================================================
-# (c) 2004  Total Phase, Inc.
-#--------------------------------------------------------------------------
-# Project : Aardvark Sample Code
-# File    : aai2c_eeprom.py
-#--------------------------------------------------------------------------
-# Perform simple read and write operations to an I2C EEPROM device.
-#--------------------------------------------------------------------------
-# Redistribution and use of this file in source and binary forms, with
-# or without modification, are permitted.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-# FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE
-# COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-# ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-# POSSIBILITY OF SUCH DAMAGE.
-#==========================================================================
 
 #==========================================================================
 # IMPORTS
@@ -51,51 +27,25 @@ bitrate = 100
 # on the Orion VPX765x boards, the address is strapped to 0x3c
 device  = 0x3c
 
-#==========================================================================
-# FUNCTIONS
-#==========================================================================
-def _writeMemory (handle, device, addr, length, zero):
-    # Write to the I2C EEPROM
-    #
-    # The AT24C02 EEPROM has 8 byte pages.  Data can written
-    # in pages, to reduce the number of overall I2C transactions
-    # executed through the Aardvark adapter.
-    n = 0
-    while (n < length):
-        data_out = array('B', [ 0 for i in range(1+PAGE_SIZE) ])
-
-        # Fill the packet with data
-        data_out[0] = addr & 0xff
-        
-        # Assemble a page of data
-        i = 1
-        while 1:
-            if not (zero): data_out[i] = n & 0xff
-
-            addr = addr + 1
-            n = n +1
-            i = i+1
-
-            if not (n < length and (addr & (PAGE_SIZE-1)) ): break
-        
-        # Truncate the array to the exact data size
-        del data_out[i:]
-
-        # Write the address and data
-        aa_i2c_write(handle, device, AA_I2C_NO_FLAGS, data_out)
-        aa_sleep_ms(10)
-
-
+# Constants for PLX register interation
 PLX_CMD_WRITE = int('00000011', 2)
 PLX_CMD_READ = int('00000100', 2)
 
+# PEX8619 Special port numbers
 PLX_PORTSEL_NT_PORT_LINK = 0x10
 PLX_PORTSEL_NT_P2P_BRIDGE = 0x11
 PLX_PORTSEL_DMA = 0x12
 PLX_PORTSEL_DMA_DESCRIPTORS = 0x13
 
+num_lanes = 16
+num_ports = 16
+
+#==========================================================================
+# FUNCTIONS
+#==========================================================================
 
 def plx_validate_read(count, data_in):
+    ''' detect errors after an aardvark read and prin errors accordingly'''
     if (count < 0):
         print "error: %s" % aa_status_string(count)
         return -1
@@ -111,6 +61,7 @@ def plx_validate_read(count, data_in):
 
 
 def plx_read4 (handle, device, port, addr):
+    ''' Read the 4 bytes that comrise a register value '''
     cmd = PLX_CMD_READ
 
     command = array('B', [
@@ -122,7 +73,7 @@ def plx_read4 (handle, device, port, addr):
 	
     #print("writing {0:s}]n".format(str(command)))
 
-    # Write the address
+    # Write the register address
     aa_i2c_write(handle, device, AA_I2C_NO_STOP, command)
 
     (count, data_in) = aa_i2c_read(handle, device, AA_I2C_NO_FLAGS, 4)
@@ -131,26 +82,29 @@ def plx_read4 (handle, device, port, addr):
     return (count, data_in)
 
 def plx_read_qword (handle, device, port, addr):
-        (count, data_in) = plx_read4(handle, device, port, addr)
+    ''' read a qword register and addemble it in to an int value '''
+    (count, data_in) = plx_read4(handle, device, port, addr)
 
-        errval = plx_validate_read(count, data_in)
-        if(errval < 0):
-            return errval
+    errval = plx_validate_read(count, data_in)
+    if(errval < 0):
+        return errval
 
-        qword = data_in[3] + (data_in[2] << 8) + (data_in[1] << 16) + (data_in[0] << 24) 
+    qword = data_in[3] + (data_in[2] << 8) + (data_in[1] << 16) + (data_in[0] << 24) 
 
-        return qword
+    return qword
 
 def plx_get_portconfig(handle, device):
+    ''' read the portcfg register '''
     val = plx_read_qword(handle, device, 0, 0x574)
     portcfg = val & 0xf
     return portcfg
 
 def plx_8619_get_portmap(portcfg):
+    ''' decode the port lane allocations from the pex8619 portcfg value '''
     if portcfg == 0:
-        portmap = 16 * [1]
+        portmap = num_ports * [1]
     elif portcfg == 1:
-        portmap = 16 * [1]
+        portmap = num_ports * [1]
         portmap[0] = 4
         portmap[4] = 0
         portmap[6] = 0
@@ -172,7 +126,7 @@ def plx_8619_get_portmap(portcfg):
         portmap = [8, 4, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1]
 
     elif portcfg == 7:
-        portmap = 16 * [0]
+        portmap = num_ports * [0]
         portmap[0] = 8
         portmap[1] = 4
         portmap[3] = 1
@@ -181,25 +135,26 @@ def plx_8619_get_portmap(portcfg):
         portmap[15] = 1
 
     elif portcfg == 7:
-        portmap = 16 * [0]
+        portmap = num_ports * [0]
         portmap[0] = 8
         portmap[1] = 4
         portmap[3] = 4
 
     elif portcfg == 8:
-        portmap = 16 * [0]
+        portmap = num_ports * [0]
         portmap[0] = 8
         portmap[1] = 8
 
     return portmap
 
 def plx_get_recv_errcounts(handle, device):
+    ''' return a list of the receive error counts per lane '''
     even_0246_counts = plx_read_qword(handle, device, 0, 0xb88)
     odd_1357_counts = plx_read_qword(handle, device, 0, 0xb8c)
     even_8ace_counts = plx_read_qword(handle, device, 0, 0xb90)
     odd_9bdf_counts = plx_read_qword(handle, device, 0, 0xb94)
 
-    recv_errcounts = 16 * [0]
+    recv_errcounts = num_lanes * [0]
     recv_errcounts[0] = (even_0246_counts >> 0) & 0xff
     recv_errcounts[1] = (odd_1357_counts >> 0) & 0xff
     recv_errcounts[2] = (even_0246_counts >> 8) & 0xff
@@ -220,18 +175,20 @@ def plx_get_recv_errcounts(handle, device):
     return recv_errcounts
 
 def plx_get_ports_enabled(handle, device):
+    ''' return a list of port enabled (1) or disabled (0) statuses '''
     val = plx_read_qword(handle, device, 0, 0x668)
-    en = 16 * [0]
-    for i in range(16):
+    en = num_ports * [0]
+    for i in range(num_ports):
         if val & 1 << i:
             en[i] = 1
     return en
 
 def plx_get_receiver_detected(handle, device):
+    ''' return a list whether a receiver was detected on each lane '''
     rd_low = plx_read_qword(handle, device, 0, 0x200)
     rd_high = plx_read_qword(handle, device, 0, 0x204)
 
-    rd = 16 * [0]
+    rd = num_lanes * [0]
     for i in range(8):
         rd[i] = (rd_low >> (24 + 1)) & 0x1
         
@@ -241,18 +198,20 @@ def plx_get_receiver_detected(handle, device):
     return rd
 
 def plx_get_lanes_up(handle, device):
+    ''' return a list of lane-up status '''
     val = plx_read_qword(handle, device, 0, 0x1f4)
-    lanes_up = 16 * [0]
-    for i in range(16):
+    lanes_up = num_lanes * [0]
+    for i in range(num_lanes):
         lanes_up[i] = (val >> i) & 0x1
 
     return lanes_up
 
 def plx_get_linkandspeed(handle, device):
+    ''' returns a tuple (widths, speeds) of port widths and speeds '''
     widths_low = plx_read_qword(handle, device, 0, 0x66c)
     widths_high = plx_read_qword(handle, device, 0, 0x670)
-    widths = 16 * [0]
-    speeds = 16 * [0]
+    widths = num_ports * [0]
+    speeds = num_ports * [0]
 
     w_map = [1, 2, 4, 8]
     s_map = [2.5, 5.0]
@@ -272,6 +231,7 @@ def plx_get_linkandspeed(handle, device):
     return (widths, speeds)
 
 def plx_get_debug_control(handle, device):
+    ''' return a dict of decoded Debug Control register subvalues '''
     val = plx_read_qword(handle, device, 0, 0x1dc)
     debug_control = {}
     debug_control["UPCFG Timer Enable"] = (val >> 4) & 0x1
@@ -295,6 +255,7 @@ def plx_get_debug_control(handle, device):
     return debug_control
 
 def plx_get_link_status(handle, device, port):
+    ''' return a dict of decoded Link Status register subvalues '''
     val = plx_read_qword(handle, device, port, 0x78)
     s_map=[0, 2.5, 5.0]
     ls = {}
@@ -316,47 +277,58 @@ def plx_get_link_status(handle, device, port):
     return ls
 
 def plx_get_vc0_negotiation_pending(handle, device, port):
+    ''' return whether vc0 negotiation is pending on <port>.
+    Note that the i2c port appears to hang if a disabled port is read.
+    '''
     val = plx_read_qword(handle, device, port, 0x160)
     return (val >> 17) & 0x1
 
 def dict_pprint(d, title):
+    ''' pretty-print dict d with the given title '''
     print(title)
     for k, v in d.iteritems():
         print("  {0}: {1}".format(str(k), str(v)))
 
 def plx_for_all_ports(handle, device, plx_func):
     ''' Applies func to all ports on device and returns a list of all results '''
-    params = 16 * [0]
-    for i in range(16):
+    params = num_lanes * [0]
+    for i in range(num_lanes):
         params[i] = plx_func(handle, device, i)
     return params
 
 def plx_for_all_enabled_ports(handle, device, enabled, plx_func):
-    ''' Applies func to all enabled ports on device and returns a list of all results '''
+    ''' Applies func to all enabled ports on device and returns a list of all results 
+    <enabled> is the list returned by plx_get_ports_enabled '''
     params = []
-    for i in range(16):
+    for i in range(num_lanes):
         if enabled[i]:
             params.append(plx_func(handle, device, i))
     return params
 
 def plx_get_bad_tlp_count(handle, device, port):
+    ''' returns <port>'s Bad TLP count '''
     val = plx_read_qword(handle, device, port, 0x1e8)
     return val
 
 def plx_get_bad_dllp_count(handle, device, port):
+    ''' returns <port>'s bad DLLP count '''
     val = plx_read_qword(handle, device, port, 0x1ec)
     return val
 
 def plx_get_bad_tlp_counts(handle, device):
+    ''' returns a list of all ports' bad TLP counts '''
     return plx_for_all_ports(handle, device, plx_get_bad_tlp_count)
 
 def plx_get_bad_dllp_counts(handle, device):
+    ''' returns a list of all ports' badDLLP counts '''
     return plx_for_all_ports(handle, device, plx_get_bad_dllp_count)
 
 def plx_get_links_status(handle, device, enabled):
+    ''' returns a list of all enbled ports' link statuses '''
     return plx_for_all_enabled_ports(handle, device, enabled, plx_get_link_status)
 
 def plx_get_vc0_negotiations_pending(handle, device, enabled):
+    ''' reuturns a list of all enabled ports' VC0 negotiation pending statuses '''
     return plx_for_all_enabled_ports(handle, device, enabled, plx_get_vc0_negotiation_pending)
 
 #==========================================================================
