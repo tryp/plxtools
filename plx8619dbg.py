@@ -395,7 +395,7 @@ receivers_detected = plx_get_receiver_detected(handle, device)
 print("Receivers Detected: {0}".format(str(receivers_detected)))
 
 vc0_negotiations_pending = plx_get_vc0_negotiations_pending(handle, device, ports_enabled)
-print("VC0 Negotiations Pending: {0}".format(str(receivers_detected)))
+print("VC0 Negotiations Pending: {0}".format(str(vc0_negotiations_pending)))
 
 lanes_up = plx_get_lanes_up(handle, device)
 print("Lanes Up: {0}".format(str(lanes_up)))
