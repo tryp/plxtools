@@ -198,7 +198,7 @@ def plx_get_receiver_detected(handle, device):
     return rd
 
 def plx_get_lanes_up(handle, device):
-    ''' return a list of lane-up status '''
+    ''' return a list of software lane-up status '''
     val = plx_read_qword(handle, device, 0, 0x1f4)
     lanes_up = num_lanes * [0]
     for i in range(num_lanes):
@@ -234,6 +234,7 @@ def plx_get_debug_control(handle, device):
     ''' return a dict of decoded Debug Control register subvalues '''
     val = plx_read_qword(handle, device, 0, 0x1dc)
     debug_control = {}
+    debug_control["**note**"] = "See PEX8619 Databook Register 14-64"
     debug_control["UPCFG Timer Enable"] = (val >> 4) & 0x1
     debug_control["SMBus Enable"] = (val >> 5) & 0x1
     debug_control["NT P2P Enable"] = (val >> 6) & 0x1
@@ -275,6 +276,23 @@ def plx_get_link_status(handle, device, port):
     ls["Link Bandwidth Management Status"] = (val >> 30) & 0x1
     ls["Link Autonomous Bandwidth Status"] = (val >> 31) & 0x1
     return ls
+
+def plx_get_link_status_and_control2(handle, device, port):
+    ''' returns a dict of decoded Link Status and Control 2 register subvalues '''
+    val = plx_read_qword(handle, device, port, 0x78)
+    s_map=[0, 2.5, 5.0]
+    lsc2 = {}
+    lsc2["**note**"] = "See PEX8619 Databook Register 14-34. (0x98h)"
+    lsc2["Port"] = port
+    lsc2["Target Link Speed"] = (val >> 0) & 0xf
+    lsc2["Enter Compliance"] = (val >> 4) & 0x1
+    lsc2["Selectable De-Emphasis"] = (val >> 6) & 0x1
+    lsc2["Transmit Margin"] = (val >> 7) & 0x3
+    lsc2["Enter Modified Compliance"] = (val >> 10) & 0x1
+    lsc2["Compliance SOS"] = (val >> 11) & 0x1
+    lsc2["Compliance De-Emphasis"] = (val >> 12) & 0x1
+    lsc2["Current De-Emphasis Level"] = (val >> 16) & 0x1
+    return lsc2
 
 def plx_get_vc0_negotiation_pending(handle, device, port):
     ''' return whether vc0 negotiation is pending on <port>.
@@ -327,9 +345,14 @@ def plx_get_links_status(handle, device, enabled):
     ''' returns a list of all enbled ports' link statuses '''
     return plx_for_all_enabled_ports(handle, device, enabled, plx_get_link_status)
 
+def plx_get_link_status_and_control2s(handle, device, enabled):
+    ''' returns a list of all enbled ports' link statuses '''
+    return plx_for_all_enabled_ports(handle, device, enabled, plx_get_link_status_and_control2)
+
 def plx_get_vc0_negotiations_pending(handle, device, enabled):
     ''' reuturns a list of all enabled ports' VC0 negotiation pending statuses '''
     return plx_for_all_enabled_ports(handle, device, enabled, plx_get_vc0_negotiation_pending)
+
 
 #==========================================================================
 # MAIN PROGRAM
@@ -387,13 +410,22 @@ print("Bad TLP Counts: {0}".format(str(bad_tlp_counts)))
 bad_dllp_counts = plx_get_bad_tlp_counts(handle, device)
 print("Bad DLLP Counts: {0}".format(str(bad_dllp_counts)))
 
-#links_status = plx_get_links_status(handle, device, ports_enabled)
-#for s in links_status:
-#    dict_pprint(s, "Port {0} PCIe Link Status".format(s["Port"]))
+print_links_status = False
+if print_links_status:
+    links_status = plx_get_links_status(handle, device, ports_enabled)
+    for s in links_status:
+        dict_pprint(s, "Port {0} PCIe Link Status".format(s["Port"]))
 
 
-#debug_control = plx_get_debug_control(handle, device)
-#dict_pprint(debug_control, "Debug Control Register")
+debug_control = plx_get_debug_control(handle, device)
+dict_pprint(debug_control, "Debug Control Register")
+
+print_status_and_controls2 = False
+if print_status_and_controls2:
+    link_status_and_control2s = plx_get_link_status_and_control2s(handle, device, ports_enabled)
+    for s in link_status_and_control2s:
+        dict_pprint(s, "Port {0} PCIe Link Status and Control2".format(s["Port"]))
+
 
 
 # Close the device
