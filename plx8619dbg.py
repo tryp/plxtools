@@ -412,9 +412,11 @@ print("Bad TLP Counts: {0}".format(str(bad_tlp_counts)))
 bad_dllp_counts = plx_get_bad_tlp_counts(handle, device)
 print("Bad DLLP Counts: {0}".format(str(bad_dllp_counts)))
 
+links_status = plx_get_links_status(handle, device, ports_enabled)
+dict_pprint(links_status[0], "Port 0 PCIe Link Status")
+
 print_links_status = False
 if print_links_status:
-    links_status = plx_get_links_status(handle, device, ports_enabled)
     for s in links_status:
         dict_pprint(s, "Port {0} PCIe Link Status".format(s["Port"]))
 
@@ -422,9 +424,11 @@ if print_links_status:
 debug_control = plx_get_debug_control(handle, device)
 dict_pprint(debug_control, "Debug Control Register")
 
+link_status_and_control2s = plx_get_link_status_and_control2s(handle, device, ports_enabled)
+dict_pprint(link_status_and_control2s[0], "Port 0 PCIe Link Status and Controls 2");
+
 print_status_and_controls2 = False
 if print_status_and_controls2:
-    link_status_and_control2s = plx_get_link_status_and_control2s(handle, device, ports_enabled)
     for s in link_status_and_control2s:
         dict_pprint(s, "Port {0} PCIe Link Status and Control2".format(s["Port"]))
 
