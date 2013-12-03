@@ -281,12 +281,12 @@ def plx_get_link_status(handle, device, port):
 
 def plx_get_link_status_and_control2(handle, device, port):
     ''' returns a dict of decoded Link Status and Control 2 register subvalues '''
-    val = plx_read_qword(handle, device, port, 0x78)
-    s_map=[0, 2.5, 5.0]
+    val = plx_read_qword(handle, device, port, 0x98)
+    s_map=[-1, 2.5, 5.0]
     lsc2 = {}
     lsc2["**note**"] = "See PEX8619 Databook Register 14-34. (0x98h)"
     lsc2["Port"] = port
-    lsc2["Target Link Speed"] = (val >> 0) & 0xf
+    lsc2["Target Link Speed"] = s_map[(val >> 0) & 0xf]
     lsc2["Enter Compliance"] = (val >> 4) & 0x1
     lsc2["Selectable De-Emphasis"] = (val >> 6) & 0x1
     lsc2["Transmit Margin"] = (val >> 7) & 0x3
